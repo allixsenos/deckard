@@ -379,27 +379,31 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             envVars["DECKARD_SESSION_TYPE"] = "claude"
         }
 
-        let initialInput: String?
+        // Build a launcher script that runs silently (no echoed commands)
+        let launcherPath = "/tmp/deckard-launch-\(tab.id.uuidString).sh"
+        var script = "#!/bin/bash\n"
+        script += "rm -f \"\(launcherPath)\"\n"  // self-delete
         if isClaude {
-            let prefix = "stty -echo; export PATH=\"$DECKARD_BIN_DIR:$PATH\"; clear; stty echo; "
+            script += "export PATH=\"$DECKARD_BIN_DIR:$PATH\"\n"
             let extraArgs = UserDefaults.standard.string(forKey: "claudeExtraArgs") ?? ""
             let extraArgsSuffix = extraArgs.isEmpty ? "" : " \(extraArgs)"
             if let sid = sessionIdToResume {
-                initialInput = "\(prefix)claude --resume \(sid)\(extraArgsSuffix)\n"
+                script += "exec claude --resume \(sid)\(extraArgsSuffix)\n"
             } else {
-                initialInput = "\(prefix)claude\(extraArgsSuffix)\n"
+                script += "exec claude\(extraArgsSuffix)\n"
             }
         } else {
-            initialInput = "stty -echo; clear; stty echo\n"
+            script += "exec $SHELL -l\n"
         }
+        try? script.write(toFile: launcherPath, atomically: true, encoding: .utf8)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: launcherPath)
 
         surfaceView.createSurface(
             app: app,
             tabId: tab.id,
             workingDirectory: project.path,
-            command: nil,
-            envVars: envVars,
-            initialInput: initialInput
+            command: launcherPath,
+            envVars: envVars
         )
 
         project.tabs.append(tab)
