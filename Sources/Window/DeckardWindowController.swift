@@ -1434,24 +1434,10 @@ class ReorderableStackView: NSStackView {
         let v = NSView()
         v.wantsLayer = true
         v.layer?.backgroundColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.6).cgColor
-        v.translatesAutoresizingMaskIntoConstraints = false
         v.isHidden = true
         return v
     }()
-    private var dropIndicatorConstraint: NSLayoutConstraint?
     private var currentDropIndex: Int = -1
-
-    override func viewDidMoveToSuperview() {
-        super.viewDidMoveToSuperview()
-        if dropIndicator.superview == nil, let sv = superview {
-            sv.addSubview(dropIndicator)
-            NSLayoutConstraint.activate([
-                dropIndicator.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
-                dropIndicator.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
-                dropIndicator.heightAnchor.constraint(equalToConstant: 2),
-            ])
-        }
-    }
 
     private func dropIndex(for sender: NSDraggingInfo) -> Int {
         let location = convert(sender.draggingLocation, from: nil)
@@ -1464,24 +1450,25 @@ class ReorderableStackView: NSStackView {
     }
 
     private func showIndicator(at index: Int) {
-        guard index != currentDropIndex, let sv = superview else { return }
+        guard index != currentDropIndex else { return }
         currentDropIndex = index
+
+        // Use frame-based positioning (no autolayout) for simplicity
+        if dropIndicator.superview !== self {
+            dropIndicator.removeFromSuperview()
+            addSubview(dropIndicator)
+        }
         dropIndicator.isHidden = false
 
-        dropIndicatorConstraint?.isActive = false
-
-        // Position indicator at the insertion point between rows
+        let yPos: CGFloat
         if index < arrangedSubviews.count {
-            let targetView = arrangedSubviews[index]
-            let topY = convert(NSPoint(x: 0, y: targetView.frame.maxY), to: sv).y
-            dropIndicatorConstraint = dropIndicator.bottomAnchor.constraint(equalTo: sv.topAnchor, constant: topY)
+            yPos = arrangedSubviews[index].frame.maxY - 1
         } else if let last = arrangedSubviews.last {
-            let bottomY = convert(NSPoint(x: 0, y: last.frame.minY), to: sv).y
-            dropIndicatorConstraint = dropIndicator.bottomAnchor.constraint(equalTo: sv.topAnchor, constant: bottomY)
+            yPos = last.frame.minY - 1
         } else {
-            dropIndicatorConstraint = dropIndicator.topAnchor.constraint(equalTo: sv.topAnchor)
+            yPos = bounds.maxY - 1
         }
-        dropIndicatorConstraint?.isActive = true
+        dropIndicator.frame = NSRect(x: 8, y: yPos, width: bounds.width - 16, height: 2)
     }
 
     private func hideIndicator() {
