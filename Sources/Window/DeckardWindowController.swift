@@ -168,16 +168,18 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             extraEnvVars["DECKARD_SESSION_TYPE"] = "claude"
         }
 
-        // For Claude tabs, use a command that execs claude directly
-        // so no shell prompt or typed command is visible.
-        let command: String? = claude ? "claude" : nil
+        // For Claude tabs, start a shell and send "exec claude" via initialInput.
+        // The clear escape sequence hides the login message and typed command.
+        // "exec" replaces the shell so closing claude closes the tab.
+        let initialInput: String? = claude ? "\u{1b}[2J\u{1b}[Hexec claude\n" : nil
 
         surfaceView.createSurface(
             app: app,
             tabId: tab.id,
             workingDirectory: workingDirectory,
-            command: command,
-            envVars: extraEnvVars
+            command: nil,
+            envVars: extraEnvVars,
+            initialInput: initialInput
         )
 
         tabs.append(tab)
