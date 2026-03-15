@@ -50,11 +50,16 @@ struct DefaultTabConfig {
     var entries: [(isClaude: Bool, name: String)]
 
     static var current: DefaultTabConfig {
-        // TODO: Make configurable via settings
-        return DefaultTabConfig(entries: [
-            (isClaude: true, name: "Claude"),
-            (isClaude: false, name: "Terminal"),
-        ])
+        let raw = UserDefaults.standard.string(forKey: "defaultTabConfig") ?? "claude, terminal"
+        let entries = raw.split(separator: ",").compactMap { item -> (isClaude: Bool, name: String)? in
+            let trimmed = item.trimmingCharacters(in: .whitespaces).lowercased()
+            switch trimmed {
+            case "claude": return (isClaude: true, name: "Claude")
+            case "terminal": return (isClaude: false, name: "Terminal")
+            default: return nil
+            }
+        }
+        return DefaultTabConfig(entries: entries.isEmpty ? [(true, "Claude"), (false, "Terminal")] : entries)
     }
 }
 
@@ -76,6 +81,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     private var welcomeLabel: NSTextField?
 
     private let sidebarWidth: CGFloat = 210
+    private var sidebarInitialized = false
     /// Recently closed projects — stored so reopening the same path restores tabs.
     private var recentlyClosedProjects: [ProjectState] = []
     private var isRestoring = false
@@ -235,6 +241,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         DispatchQueue.main.async { [self] in
             let saved = CGFloat(UserDefaults.standard.double(forKey: "sidebarWidth"))
             splitView.setPosition(saved > 80 ? saved : sidebarWidth, ofDividerAt: 0)
+            sidebarInitialized = true
         }
 
         window?.makeKeyAndOrderFront(nil)
@@ -247,9 +254,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     func splitView(_ splitView: NSSplitView, canCollapseSubview s: NSView) -> Bool { false }
 
     func splitViewDidResizeSubviews(_ notification: Notification) {
-        if sidebarView.frame.width > 0 {
-            UserDefaults.standard.set(Double(sidebarView.frame.width), forKey: "sidebarWidth")
-        }
+        guard sidebarInitialized, sidebarView.frame.width > 0 else { return }
+        UserDefaults.standard.set(Double(sidebarView.frame.width), forKey: "sidebarWidth")
     }
 
     // MARK: - Project Management
@@ -748,8 +754,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         for (i, tab) in project.tabs.enumerated() {
             let isSelected = (i == project.selectedTabIndex)
-            let icon = tab.isClaude ? "" : "$ "  // Claude tabs use badge dot instead
-            let title = " \(icon)\(tab.name) "
+            let title = " \(tab.name) "
 
             let tabView = HorizontalTabView(
                 displayTitle: title,
@@ -1133,7 +1138,7 @@ class HorizontalTabView: NSView, NSTextFieldDelegate {
         closeButton.action = closeAction
         closeButton.tag = index
 
-        // Badge dot for Claude tabs (replaces the unicode icon)
+        // Badge dot for Claude tabs — positioned on the right by layout constraints below
         if isClaude {
             let dot = NSView()
             dot.wantsLayer = true
@@ -1145,7 +1150,6 @@ class HorizontalTabView: NSView, NSTextFieldDelegate {
             NSLayoutConstraint.activate([
                 dot.widthAnchor.constraint(equalToConstant: 7),
                 dot.heightAnchor.constraint(equalToConstant: 7),
-                dot.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
                 dot.centerYAnchor.constraint(equalTo: centerYAnchor),
             ])
             if badgeState == .thinking {
@@ -1160,20 +1164,27 @@ class HorizontalTabView: NSView, NSTextFieldDelegate {
         addSubview(closeButton)
         closeButton.isHidden = true
 
-        let labelLeading = badgeDot != nil
-            ? label.leadingAnchor.constraint(equalTo: badgeDot!.trailingAnchor, constant: 5)
-            : label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8)
+        // Layout: [close] [label] [badge]  — close on left, badge on right
+        let labelLeading = closeButton.trailingAnchor.constraint(equalTo: label.leadingAnchor, constant: -2)
 
-        NSLayoutConstraint.activate([
+        var constraints = [
             heightAnchor.constraint(equalToConstant: 28),
-            labelLeading,
-            label.centerYAnchor.constraint(equalTo: centerYAnchor),
-            closeButton.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 2),
-            closeButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+            closeButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
             closeButton.centerYAnchor.constraint(equalTo: centerYAnchor),
             closeButton.widthAnchor.constraint(equalToConstant: 16),
             closeButton.heightAnchor.constraint(equalToConstant: 16),
-        ])
+            labelLeading,
+            label.centerYAnchor.constraint(equalTo: centerYAnchor),
+        ]
+
+        if let dot = badgeDot {
+            constraints.append(dot.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8))
+            constraints.append(label.trailingAnchor.constraint(lessThanOrEqualTo: dot.leadingAnchor, constant: -4))
+        } else {
+            constraints.append(label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8))
+        }
+
+        NSLayoutConstraint.activate(constraints)
 
         if isSelected {
             layer?.backgroundColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.2).cgColor
