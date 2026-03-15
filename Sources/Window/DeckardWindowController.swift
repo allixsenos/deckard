@@ -82,6 +82,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     private let sidebarWidth: CGFloat = 210
     private var sidebarInitialized = false
+    private var startupOverlay: NSView?
     /// Recently closed projects — stored so reopening the same path restores tabs.
     private var recentlyClosedProjects: [ProjectState] = []
     private var isRestoring = false
@@ -114,30 +115,24 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         setupUI()
 
-        // Startup overlay — covers the entire content view at the highest z-order
-        // to hide shell init flash. Added to contentView (not terminalContainer)
-        // so it's above everything including surfaces that render immediately.
+        // Startup overlay — removed when the shell finishes initializing
+        // (detected by the clear command completing, which triggers a title/pwd change)
         let startupOverlay = NSView()
         startupOverlay.wantsLayer = true
         startupOverlay.layer?.backgroundColor = ghosttyApp.defaultBackgroundColor.cgColor
         startupOverlay.layer?.zPosition = 9999
         startupOverlay.translatesAutoresizingMaskIntoConstraints = false
-        if let w = self.window, let contentView = w.contentView {
-            contentView.addSubview(startupOverlay)
-            NSLayoutConstraint.activate([
-                startupOverlay.topAnchor.constraint(equalTo: contentView.topAnchor),
-                startupOverlay.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-                startupOverlay.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-                startupOverlay.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            ])
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            NSAnimationContext.runAnimationGroup({ ctx in
-                ctx.duration = 0.3
-                startupOverlay.animator().alphaValue = 0
-            }, completionHandler: {
-                startupOverlay.removeFromSuperview()
-            })
+        terminalContainerView.addSubview(startupOverlay)
+        self.startupOverlay = startupOverlay
+        NSLayoutConstraint.activate([
+            startupOverlay.topAnchor.constraint(equalTo: terminalContainerView.topAnchor),
+            startupOverlay.bottomAnchor.constraint(equalTo: terminalContainerView.bottomAnchor),
+            startupOverlay.leadingAnchor.constraint(equalTo: terminalContainerView.leadingAnchor),
+            startupOverlay.trailingAnchor.constraint(equalTo: terminalContainerView.trailingAnchor),
+        ])
+        // Safety fallback in case signal never comes
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            self?.dismissStartupOverlay()
         }
 
         restoreOrCreateInitial()
@@ -431,25 +426,23 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         project.tabs.append(tab)
 
-        // Brief overlay to hide the stty/clear commands flashing
+        // Overlay to hide stty/clear flash — dismissed by title/pwd callback
         let overlay = NSView()
         overlay.wantsLayer = true
         overlay.layer?.backgroundColor = ghosttyApp.defaultBackgroundColor.cgColor
+        overlay.layer?.zPosition = 9999
         overlay.translatesAutoresizingMaskIntoConstraints = false
         surfaceView.addSubview(overlay)
+        surfaceView.tabOverlay = overlay
         NSLayoutConstraint.activate([
             overlay.topAnchor.constraint(equalTo: surfaceView.topAnchor),
             overlay.bottomAnchor.constraint(equalTo: surfaceView.bottomAnchor),
             overlay.leadingAnchor.constraint(equalTo: surfaceView.leadingAnchor),
             overlay.trailingAnchor.constraint(equalTo: surfaceView.trailingAnchor),
         ])
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            NSAnimationContext.runAnimationGroup({ ctx in
-                ctx.duration = 0.3
-                overlay.animator().alphaValue = 0
-            }, completionHandler: {
-                overlay.removeFromSuperview()
-            })
+        // Safety fallback
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            overlay.removeFromSuperview()
         }
     }
 
@@ -543,21 +536,45 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     // MARK: - Surface Callbacks
 
+    func dismissStartupOverlay() {
+        guard let overlay = startupOverlay else { return }
+        startupOverlay = nil
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.15
+            overlay.animator().alphaValue = 0
+        }, completionHandler: {
+            overlay.removeFromSuperview()
+        })
+    }
+
+    private func dismissTabOverlay(for view: TerminalNSView) {
+        guard let overlay = view.tabOverlay else { return }
+        view.tabOverlay = nil
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.15
+            overlay.animator().alphaValue = 0
+        }, completionHandler: { overlay.removeFromSuperview() })
+    }
+
     func setTitle(_ title: String, forSurface surface: ghostty_surface_t?) {
+        dismissStartupOverlay()
         guard let surface = surface else { return }
         for project in projects {
             for tab in project.tabs where tab.surfaceView.surface == surface {
                 tab.surfaceView.title = title
+                dismissTabOverlay(for: tab.surfaceView)
                 return
             }
         }
     }
 
     func setPwd(_ pwd: String, forSurface surface: ghostty_surface_t?) {
+        dismissStartupOverlay()
         guard let surface = surface else { return }
         for project in projects {
             for tab in project.tabs where tab.surfaceView.surface == surface {
                 tab.surfaceView.pwd = pwd
+                dismissTabOverlay(for: tab.surfaceView)
                 return
             }
         }

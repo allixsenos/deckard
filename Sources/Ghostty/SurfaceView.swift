@@ -29,6 +29,7 @@ class TerminalNSView: NSView {
 
     var title: String = ""
     var pwd: String?
+    var tabOverlay: NSView?  // dismissed when terminal is ready
 
     override var acceptsFirstResponder: Bool { true }
 
