@@ -817,6 +817,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
 
         sidebarStackView.registerForDraggedTypes([deckardProjectDragType])
+        sidebarView.registerForDraggedTypes([deckardProjectDragType])
         sidebarStackView.onReorder = { [weak self] from, to in
             self?.reorderProject(from: from, to: to)
         }
@@ -1435,30 +1436,88 @@ class AddTabButton: NSView {
 class ReorderableStackView: NSStackView {
     var onReorder: ((Int, Int) -> Void)?
 
+    private let dropIndicator: NSView = {
+        let v = NSView()
+        v.wantsLayer = true
+        v.layer?.backgroundColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.6).cgColor
+        v.translatesAutoresizingMaskIntoConstraints = false
+        v.isHidden = true
+        return v
+    }()
+    private var dropIndicatorConstraint: NSLayoutConstraint?
+    private var currentDropIndex: Int = -1
+
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        if dropIndicator.superview == nil, let sv = superview {
+            sv.addSubview(dropIndicator)
+            NSLayoutConstraint.activate([
+                dropIndicator.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+                dropIndicator.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+                dropIndicator.heightAnchor.constraint(equalToConstant: 2),
+            ])
+        }
+    }
+
+    private func dropIndex(for sender: NSDraggingInfo) -> Int {
+        let location = convert(sender.draggingLocation, from: nil)
+        for (i, view) in arrangedSubviews.enumerated() {
+            if location.y > view.frame.midY {
+                return i
+            }
+        }
+        return arrangedSubviews.count
+    }
+
+    private func showIndicator(at index: Int) {
+        guard index != currentDropIndex else { return }
+        currentDropIndex = index
+        dropIndicator.isHidden = false
+
+        dropIndicatorConstraint?.isActive = false
+        let y: CGFloat
+        if index < arrangedSubviews.count {
+            y = arrangedSubviews[index].frame.maxY
+        } else if let last = arrangedSubviews.last {
+            y = last.frame.minY - 2
+        } else {
+            y = bounds.maxY
+        }
+        dropIndicatorConstraint = dropIndicator.topAnchor.constraint(equalTo: superview!.topAnchor, constant: convert(NSPoint(x: 0, y: y), to: superview!).y - 1)
+        dropIndicatorConstraint?.isActive = true
+    }
+
+    private func hideIndicator() {
+        dropIndicator.isHidden = true
+        currentDropIndex = -1
+    }
+
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
         guard sender.draggingPasteboard.types?.contains(deckardProjectDragType) == true else { return [] }
+        showIndicator(at: dropIndex(for: sender))
         return .move
     }
 
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
         guard sender.draggingPasteboard.types?.contains(deckardProjectDragType) == true else { return [] }
+        showIndicator(at: dropIndex(for: sender))
         return .move
     }
 
+    override func draggingExited(_ sender: NSDraggingInfo?) {
+        hideIndicator()
+    }
+
+    override func draggingEnded(_ sender: NSDraggingInfo) {
+        hideIndicator()
+    }
+
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        hideIndicator()
         guard let fromStr = sender.draggingPasteboard.string(forType: deckardProjectDragType),
               let fromIndex = Int(fromStr) else { return false }
 
-        let location = convert(sender.draggingLocation, from: nil)
-        var toIndex = arrangedSubviews.count
-
-        for (i, view) in arrangedSubviews.enumerated() {
-            if location.y > view.frame.midY {
-                toIndex = i
-                break
-            }
-        }
-
+        let toIndex = dropIndex(for: sender)
         if toIndex != fromIndex {
             onReorder?(fromIndex, toIndex)
         }
