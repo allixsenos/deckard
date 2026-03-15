@@ -415,11 +415,15 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             initialInput = "stty -echo; clear; stty echo\n"
         }
 
-        // Hide surface until shell is ready (title/pwd signal reveals it)
-        surfaceView.alphaValue = 0
+        // Hide surface until shell is ready (title/pwd signal reveals it).
+        // Set the layer opaque background to match terminal BEFORE creating the surface,
+        // so the first Metal frame renders behind the opaque layer.
+        surfaceView.wantsLayer = true
+        surfaceView.layer?.isOpaque = true
+        surfaceView.layer?.backgroundColor = ghosttyApp.defaultBackgroundColor.cgColor
+        surfaceView.isHidden = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak surfaceView] in
-            guard let sv = surfaceView, sv.alphaValue < 1 else { return }
-            sv.alphaValue = 1
+            surfaceView?.isHidden = false
         }
 
         surfaceView.createSurface(
@@ -537,11 +541,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     }
 
     private func revealSurface(_ view: TerminalNSView) {
-        guard view.alphaValue < 1 else { return }
-        NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.15
-            view.animator().alphaValue = 1
-        })
+        guard view.isHidden else { return }
+        view.isHidden = false
     }
 
     func setTitle(_ title: String, forSurface surface: ghostty_surface_t?) {

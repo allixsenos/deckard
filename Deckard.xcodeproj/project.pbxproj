@@ -187,7 +187,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "mkdir -p \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin\"\ncp -f \"${PROJECT_DIR}/Resources/AppIcon.icns\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AppIcon.icns\"\ncp -f \"${PROJECT_DIR}/Resources/bin/claude\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/claude\"\ncp -f \"${PROJECT_DIR}/Resources/bin/deckard-mcp\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/deckard-mcp\"\nchmod +x \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/claude\"\nchmod +x \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/deckard-mcp\"\n";
+			shellScript = "mkdir -p \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin\"\ncp -f \"${PROJECT_DIR}/Resources/AppIcon.icns\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AppIcon.icns\"\ncp -f \"${PROJECT_DIR}/Resources/Credits.html\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Credits.html\"\ncp -f \"${PROJECT_DIR}/Resources/bin/claude\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/claude\"\ncp -f \"${PROJECT_DIR}/Resources/bin/deckard-mcp\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/deckard-mcp\"\nchmod +x \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/claude\"\nchmod +x \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/deckard-mcp\"\n";
 		};
 		5F4D41CAC0165B5C0FC120FE /* Set App Icon */ = {
 			isa = PBXShellScriptBuildPhase;
