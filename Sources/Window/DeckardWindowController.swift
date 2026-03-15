@@ -152,8 +152,15 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     // MARK: - Tab Management
 
+    static var defaultWorkingDirectory: String {
+        get { UserDefaults.standard.string(forKey: "defaultWorkingDirectory") ?? NSHomeDirectory() + "/Documents" }
+        set { UserDefaults.standard.set(newValue, forKey: "defaultWorkingDirectory") }
+    }
+
     func createTab(claude: Bool, workingDirectory: String? = nil, name: String? = nil) {
         guard let app = ghosttyApp.app else { return }
+
+        let effectiveWorkingDirectory = workingDirectory ?? Self.defaultWorkingDirectory
 
         let surfaceView = TerminalNSView()
         let tabName = name ?? (claude ? "New Session" : "Terminal")
@@ -176,7 +183,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         surfaceView.createSurface(
             app: app,
             tabId: tab.id,
-            workingDirectory: workingDirectory,
+            workingDirectory: effectiveWorkingDirectory,
             command: nil,
             envVars: extraEnvVars,
             initialInput: initialInput
@@ -289,55 +296,24 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     // MARK: - Sidebar Rendering
 
     private func rebuildSidebar() {
-        // Remove all existing tab buttons
         sidebarStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
         for (i, tab) in tabs.enumerated() {
-            let button = makeTabButton(for: tab, at: i)
-            sidebarStackView.addArrangedSubview(button)
+            let row = TabRowView(title: tab.isMaster ? "\u{2605} \(tab.name)" : tab.name,
+                                 bold: tab.isMaster,
+                                 index: i,
+                                 target: self,
+                                 action: #selector(tabRowClicked(_:)))
+            sidebarStackView.addArrangedSubview(row)
         }
 
         updateSidebarSelection()
     }
 
-    private func makeTabButton(for tab: TabItem, at index: Int) -> NSView {
-        let title = tab.isMaster ? "\u{2605} \(tab.name)" : tab.name
-        let button = NSButton(title: title, target: self, action: #selector(tabButtonClicked(_:)))
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.bezelStyle = .recessed
-        button.setButtonType(.momentaryPushIn)
-        button.isBordered = false
-        button.alignment = .left
-        button.font = tab.isMaster ? .boldSystemFont(ofSize: 12) : .systemFont(ofSize: 12)
-        button.contentTintColor = .labelColor
-        button.tag = index
-        button.wantsLayer = true
-        button.layer?.cornerRadius = 4
-
-        // Use attributed title for left padding
-        let style = NSMutableParagraphStyle()
-        style.alignment = .left
-        style.firstLineHeadIndent = 10
-        let attrTitle = NSAttributedString(string: title, attributes: [
-            .font: button.font!,
-            .foregroundColor: NSColor.labelColor,
-            .paragraphStyle: style,
-        ])
-        button.attributedTitle = attrTitle
-
-        NSLayoutConstraint.activate([
-            button.heightAnchor.constraint(equalToConstant: 28),
-        ])
-
-        return button
-    }
-
     private func updateSidebarSelection() {
         for (i, view) in sidebarStackView.arrangedSubviews.enumerated() {
-            if i == selectedTabIndex {
-                view.layer?.backgroundColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.3).cgColor
-            } else {
-                view.layer?.backgroundColor = NSColor.clear.cgColor
+            if let row = view as? TabRowView {
+                row.isSelected = (i == selectedTabIndex)
             }
         }
     }
@@ -345,16 +321,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     private func updateSidebarItem(at index: Int) {
         guard index >= 0, index < sidebarStackView.arrangedSubviews.count else { return }
         let tab = tabs[index]
-        if let button = sidebarStackView.arrangedSubviews[index] as? NSButton {
-            let title = tab.isMaster ? "\u{2605} \(tab.name)" : tab.name
-            let style = NSMutableParagraphStyle()
-            style.alignment = .left
-            style.firstLineHeadIndent = 10
-            button.attributedTitle = NSAttributedString(string: title, attributes: [
-                .font: button.font!,
-                .foregroundColor: NSColor.labelColor,
-                .paragraphStyle: style,
-            ])
+        if let row = sidebarStackView.arrangedSubviews[index] as? TabRowView {
+            row.title = tab.isMaster ? "\u{2605} \(tab.name)" : tab.name
         }
     }
 
@@ -370,8 +338,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     // MARK: - Sidebar Actions
 
-    @objc private func tabButtonClicked(_ sender: NSButton) {
-        let index = sender.tag
+    @objc private func tabRowClicked(_ sender: TabRowView) {
+        let index = sender.index
         if index >= 0, index < tabs.count {
             selectTab(at: index)
         }
@@ -401,3 +369,62 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     }
 }
 
+// MARK: - TabRowView
+
+/// A clickable row in the sidebar representing one tab.
+class TabRowView: NSView {
+    var title: String {
+        didSet { label.stringValue = title }
+    }
+    var isSelected: Bool = false {
+        didSet { needsDisplay = true }
+    }
+    let index: Int
+    private let label: NSTextField
+    private weak var target: AnyObject?
+    private let action: Selector
+
+    init(title: String, bold: Bool, index: Int, target: AnyObject, action: Selector) {
+        self.title = title
+        self.index = index
+        self.target = target
+        self.action = action
+
+        label = NSTextField(labelWithString: title)
+        label.font = bold ? .boldSystemFont(ofSize: 12) : .systemFont(ofSize: 12)
+        label.textColor = .labelColor
+        label.lineBreakMode = .byTruncatingTail
+        label.maximumNumberOfLines = 1
+
+        super.init(frame: .zero)
+        translatesAutoresizingMaskIntoConstraints = false
+        wantsLayer = true
+
+        label.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(label)
+
+        NSLayoutConstraint.activate([
+            heightAnchor.constraint(equalToConstant: 28),
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            label.centerYAnchor.constraint(equalTo: centerYAnchor),
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is not supported")
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        if isSelected {
+            NSColor.selectedContentBackgroundColor.withAlphaComponent(0.3).setFill()
+            let path = NSBezierPath(roundedRect: bounds, xRadius: 4, yRadius: 4)
+            path.fill()
+        }
+        super.draw(dirtyRect)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        _ = target?.perform(action, with: self)
+    }
+}

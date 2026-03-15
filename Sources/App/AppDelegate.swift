@@ -83,6 +83,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "About Deckard", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Settings...", action: #selector(showSettings), keyEquivalent: ",")
+        appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Quit Deckard", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appMenuItem.submenu = appMenu
         mainMenu.addItem(appMenuItem)
@@ -145,5 +147,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func focusMasterSession() {
         windowController?.focusMasterSession()
+    }
+
+    @objc private func showSettings() {
+        let alert = NSAlert()
+        alert.messageText = "Deckard Settings"
+        alert.informativeText = "Default working directory for new tabs:"
+
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 350, height: 24))
+        input.stringValue = DeckardWindowController.defaultWorkingDirectory
+        alert.accessoryView = input
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Browse...")
+        alert.addButton(withTitle: "Cancel")
+
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            let path = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !path.isEmpty {
+                DeckardWindowController.defaultWorkingDirectory = path
+            }
+        } else if response == .alertSecondButtonReturn {
+            let panel = NSOpenPanel()
+            panel.canChooseDirectories = true
+            panel.canChooseFiles = false
+            panel.allowsMultipleSelection = false
+            panel.directoryURL = URL(fileURLWithPath: DeckardWindowController.defaultWorkingDirectory)
+            if panel.runModal() == .OK, let url = panel.url {
+                DeckardWindowController.defaultWorkingDirectory = url.path
+            }
+        }
     }
 }
