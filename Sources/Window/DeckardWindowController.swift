@@ -269,7 +269,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         NSLayoutConstraint.activate([
             contextStatusBar.leadingAnchor.constraint(equalTo: rightPane.leadingAnchor),
-            contextStatusBar.trailingAnchor.constraint(equalTo: rightPane.trailingAnchor),
+            contextStatusBar.trailingAnchor.constraint(equalTo: rightPane.trailingAnchor, constant: -12),
             contextStatusBar.bottomAnchor.constraint(equalTo: rightPane.bottomAnchor),
             contextStatusBar.heightAnchor.constraint(equalToConstant: 22),
             statusDivider.leadingAnchor.constraint(equalTo: rightPane.leadingAnchor),
@@ -632,7 +632,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
 
         let turns = usage.turnCount
-        let text = "\(usage.shortModel) · \(turns) turn\(turns == 1 ? "" : "s") · Context: \(usage.contextString)     "
+        let text = "\(usage.shortModel) · \(turns) turn\(turns == 1 ? "" : "s") · Context: \(usage.contextString)"
         let para = NSMutableParagraphStyle()
         para.alignment = .right
         let attr = NSMutableAttributedString(string: text)
