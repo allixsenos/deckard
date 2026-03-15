@@ -415,16 +415,11 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             initialInput = "stty -echo; clear; stty echo\n"
         }
 
-        // Overlay added to surfaceView — will be moved to terminalContainerView
-        // in showTab() so it sits above the Metal rendering layer
-        let overlay = NSView()
-        overlay.wantsLayer = true
-        overlay.layer?.backgroundColor = ghosttyApp.defaultBackgroundColor.cgColor
-        overlay.translatesAutoresizingMaskIntoConstraints = false
-        surfaceView.tabOverlay = overlay
-        // Safety fallback
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak overlay] in
-            overlay?.removeFromSuperview()
+        // Hide surface until shell is ready (title/pwd signal reveals it)
+        surfaceView.alphaValue = 0
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak surfaceView] in
+            guard let sv = surfaceView, sv.alphaValue < 1 else { return }
+            sv.alphaValue = 1
         }
 
         surfaceView.createSurface(
@@ -505,8 +500,6 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     private func showTab(_ tab: TabItem) {
         welcomeLabel?.isHidden = true
-        // Remove any existing overlay from container
-        terminalContainerView.subviews.filter { $0.layer?.zPosition == 9999 }.forEach { $0.removeFromSuperview() }
         currentTerminalView?.removeFromSuperview()
 
         let view = tab.surfaceView
@@ -519,18 +512,6 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             view.trailingAnchor.constraint(equalTo: terminalContainerView.trailingAnchor),
         ])
         currentTerminalView = view
-
-        // If this tab has a pending overlay, add it ON TOP of the Metal surface
-        if let overlay = tab.surfaceView.tabOverlay {
-            overlay.layer?.zPosition = 9999
-            terminalContainerView.addSubview(overlay)
-            NSLayoutConstraint.activate([
-                overlay.topAnchor.constraint(equalTo: terminalContainerView.topAnchor),
-                overlay.bottomAnchor.constraint(equalTo: terminalContainerView.bottomAnchor),
-                overlay.leadingAnchor.constraint(equalTo: terminalContainerView.leadingAnchor),
-                overlay.trailingAnchor.constraint(equalTo: terminalContainerView.trailingAnchor),
-            ])
-        }
 
         window?.makeFirstResponder(view)
     }
@@ -555,13 +536,12 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         })
     }
 
-    private func dismissTabOverlay(for view: TerminalNSView) {
-        guard let overlay = view.tabOverlay else { return }
-        view.tabOverlay = nil
+    private func revealSurface(_ view: TerminalNSView) {
+        guard view.alphaValue < 1 else { return }
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.15
-            overlay.animator().alphaValue = 0
-        }, completionHandler: { overlay.removeFromSuperview() })
+            view.animator().alphaValue = 1
+        })
     }
 
     func setTitle(_ title: String, forSurface surface: ghostty_surface_t?) {
@@ -570,7 +550,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         for project in projects {
             for tab in project.tabs where tab.surfaceView.surface == surface {
                 tab.surfaceView.title = title
-                dismissTabOverlay(for: tab.surfaceView)
+                revealSurface(tab.surfaceView)
                 return
             }
         }
@@ -582,7 +562,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         for project in projects {
             for tab in project.tabs where tab.surfaceView.surface == surface {
                 tab.surfaceView.pwd = pwd
-                dismissTabOverlay(for: tab.surfaceView)
+                revealSurface(tab.surfaceView)
                 return
             }
         }
