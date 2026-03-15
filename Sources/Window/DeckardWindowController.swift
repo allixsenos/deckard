@@ -91,6 +91,11 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         window.backgroundColor = ghosttyApp.defaultBackgroundColor
         window.tabbingMode = .disallowed
 
+        // Extend content into the title bar
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.styleMask.insert(.fullSizeContentView)
+
         super.init(window: window)
 
         window.setFrameAutosaveName("DeckardMainWindow")
@@ -181,7 +186,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             tabBar.topAnchor.constraint(equalTo: rightPane.topAnchor),
             tabBar.leadingAnchor.constraint(equalTo: rightPane.leadingAnchor),
             tabBar.trailingAnchor.constraint(equalTo: rightPane.trailingAnchor),
-            tabBar.heightAnchor.constraint(equalToConstant: 28),
+            tabBar.heightAnchor.constraint(equalToConstant: 38), // match title bar height
 
             terminalContainerView.topAnchor.constraint(equalTo: tabBar.bottomAnchor),
             terminalContainerView.leadingAnchor.constraint(equalTo: rightPane.leadingAnchor),
