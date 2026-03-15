@@ -677,6 +677,13 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 self.projects[i].name = newName
                 self.saveState()
             }
+            row.onClearName = { [weak self] in
+                guard let self = self, i < self.projects.count else { return }
+                let defaultName = (self.projects[i].path as NSString).lastPathComponent
+                self.projects[i].name = defaultName
+                self.rebuildSidebar()
+                self.saveState()
+            }
             row.onClose = { [weak self] in
                 self?.closeProject(at: i)
             }
@@ -737,6 +744,16 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 guard let self = self, let project = self.currentProject,
                       i < project.tabs.count else { return }
                 project.tabs[i].name = newName
+                self.rebuildTabBar()
+                self.saveState()
+            }
+            tabView.onClearName = { [weak self] in
+                guard let self = self, let project = self.currentProject,
+                      i < project.tabs.count else { return }
+                let tab = project.tabs[i]
+                let base = tab.isClaude ? "Claude" : "Terminal"
+                let sameType = project.tabs.filter { $0.isClaude == tab.isClaude }
+                tab.name = sameType.count <= 1 ? base : "\(base) #\(i + 1)"
                 self.rebuildTabBar()
                 self.saveState()
             }
@@ -825,6 +842,7 @@ class TabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         }
     }
     var onRename: ((String) -> Void)?
+    var onClearName: (() -> Void)?  // called when user enters empty name
     var onClose: (() -> Void)?
     var onReorder: ((Int, Int) -> Void)?
     let index: Int
@@ -971,7 +989,10 @@ class TabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         label.isEditable = false
         label.isSelectable = false
         let newName = label.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !newName.isEmpty && newName != title {
+        if newName.isEmpty {
+            // Reset to default name
+            onClearName?()
+        } else if newName != title {
             title = newName
             onRename?(newName)
         } else {
@@ -1010,7 +1031,8 @@ class HorizontalTabView: NSView, NSTextFieldDelegate {
     private let clickAction: Selector
     private var isSelected: Bool
     var onRename: ((String) -> Void)?
-    private var rawName: String  // name without icon prefix
+    var onClearName: (() -> Void)?
+    private var rawName: String
 
     private var displayTitle: String
     private var editWidthConstraint: NSLayoutConstraint?
@@ -1116,11 +1138,13 @@ class HorizontalTabView: NSView, NSTextFieldDelegate {
         label.isSelectable = false
         label.isBezeled = false
         let newName = label.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !newName.isEmpty && newName != rawName {
+        if newName.isEmpty {
+            onClearName?()  // reset to default name
+        } else if newName != rawName {
             rawName = newName
-            onRename?(newName)  // triggers rebuildTabBar which recreates this view
+            onRename?(newName)
         } else {
-            label.stringValue = displayTitle  // restore icon prefix
+            label.stringValue = displayTitle
         }
     }
 
