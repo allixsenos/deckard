@@ -168,10 +168,10 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             extraEnvVars["DECKARD_SESSION_TYPE"] = "claude"
         }
 
-        // For Claude tabs, start a shell and send "exec claude" via initialInput.
-        // The clear escape sequence hides the login message and typed command.
-        // "exec" replaces the shell so closing claude closes the tab.
-        let initialInput: String? = claude ? "\u{1b}[2J\u{1b}[Hexec claude\n" : nil
+        // For Claude tabs, start a shell and launch claude via initialInput.
+        // "clear" hides the login message, "exec" replaces the shell so
+        // closing claude closes the tab.
+        let initialInput: String? = claude ? "clear && exec claude\n" : nil
 
         surfaceView.createSurface(
             app: app,
