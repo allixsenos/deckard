@@ -1114,9 +1114,9 @@ class HorizontalTabView: NSView, NSTextFieldDelegate {
         label.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
 
         closeButton = NSButton(title: "\u{00D7}", target: nil, action: nil)
-        closeButton.bezelStyle = .recessed
+        closeButton.bezelStyle = .inline
         closeButton.isBordered = false
-        closeButton.font = .systemFont(ofSize: 13)
+        closeButton.font = .systemFont(ofSize: 11)
         closeButton.contentTintColor = .tertiaryLabelColor
 
         super.init(frame: .zero)
@@ -1166,6 +1166,7 @@ class HorizontalTabView: NSView, NSTextFieldDelegate {
             closeButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
             closeButton.centerYAnchor.constraint(equalTo: centerYAnchor),
             closeButton.widthAnchor.constraint(equalToConstant: 16),
+            closeButton.heightAnchor.constraint(equalToConstant: 16),
         ])
 
         if isSelected {
@@ -1265,7 +1266,7 @@ class AddTabButton: NSView {
         self.leftClickAction = leftClickAction
         self.rightClickAction = rightClickAction
         label = NSTextField(labelWithString: "  +")
-        label.font = .systemFont(ofSize: 13, weight: .medium)
+        label.font = .systemFont(ofSize: 11, weight: .medium)
         label.textColor = .secondaryLabelColor
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
