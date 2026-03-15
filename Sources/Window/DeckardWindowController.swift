@@ -14,6 +14,7 @@ class TabItem {
 
     enum BadgeState: String {
         case none
+        case idle             // grey - connected but no activity yet
         case thinking
         case waitingForInput
         case needsPermission
@@ -356,7 +357,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
         let tab = TabItem(surfaceView: surfaceView, name: tabName, isClaude: isClaude)
         if isClaude {
-            tab.badgeState = .waitingForInput  // Claude starts at the interactive prompt
+            tab.badgeState = .idle
         }
 
         var envVars: [String: String] = [:]
@@ -945,6 +946,7 @@ class TabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
     static func colorForBadge(_ state: TabItem.BadgeState) -> NSColor {
         switch state {
         case .none: return .clear
+        case .idle: return .systemGray
         case .thinking: return NSColor(red: 0.85, green: 0.65, blue: 0.2, alpha: 1.0)
         case .waitingForInput: return .systemBlue
         case .needsPermission: return .systemOrange
