@@ -114,19 +114,24 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         setupUI()
 
-        // Startup overlay — covers the whole terminal area to hide shell init flash
+        // Startup overlay — covers the entire content view at the highest z-order
+        // to hide shell init flash. Added to contentView (not terminalContainer)
+        // so it's above everything including surfaces that render immediately.
         let startupOverlay = NSView()
         startupOverlay.wantsLayer = true
         startupOverlay.layer?.backgroundColor = ghosttyApp.defaultBackgroundColor.cgColor
+        startupOverlay.layer?.zPosition = 9999
         startupOverlay.translatesAutoresizingMaskIntoConstraints = false
-        terminalContainerView.addSubview(startupOverlay)
-        NSLayoutConstraint.activate([
-            startupOverlay.topAnchor.constraint(equalTo: terminalContainerView.topAnchor),
-            startupOverlay.bottomAnchor.constraint(equalTo: terminalContainerView.bottomAnchor),
-            startupOverlay.leadingAnchor.constraint(equalTo: terminalContainerView.leadingAnchor),
-            startupOverlay.trailingAnchor.constraint(equalTo: terminalContainerView.trailingAnchor),
-        ])
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+        if let w = self.window, let contentView = w.contentView {
+            contentView.addSubview(startupOverlay)
+            NSLayoutConstraint.activate([
+                startupOverlay.topAnchor.constraint(equalTo: contentView.topAnchor),
+                startupOverlay.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+                startupOverlay.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+                startupOverlay.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            ])
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             NSAnimationContext.runAnimationGroup({ ctx in
                 ctx.duration = 0.3
                 startupOverlay.animator().alphaValue = 0
