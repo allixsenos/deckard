@@ -70,6 +70,26 @@ class HookHandler {
             )
             reply(ControlResponse(ok: true))
 
+        case "rename-tab":
+            if let tabId = message.tabId, let name = message.name {
+                windowController?.renameTab(id: tabId, name: name)
+            }
+            reply(ControlResponse(ok: true))
+
+        case "close-tab":
+            if let tabId = message.tabId {
+                windowController?.closeTabById(tabId)
+            }
+            reply(ControlResponse(ok: true))
+
+        case "focus-tab":
+            if let tabId = message.tabId {
+                if let uuid = UUID(uuidString: tabId) {
+                    windowController?.focusTabById(uuid)
+                }
+            }
+            reply(ControlResponse(ok: true))
+
         case "ping":
             reply(ControlResponse(ok: true, message: "pong"))
 

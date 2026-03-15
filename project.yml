@@ -25,7 +25,9 @@ targets:
       - script: |
           mkdir -p "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin"
           cp -f "${PROJECT_DIR}/Resources/bin/claude" "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/claude"
+          cp -f "${PROJECT_DIR}/Resources/bin/deckard-mcp" "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/deckard-mcp"
           chmod +x "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/claude"
+          chmod +x "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/deckard-mcp"
         name: Copy Claude Wrapper
     settings:
       base:

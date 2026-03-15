@@ -36,16 +36,21 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     private var selectedTabIndex: Int = -1
 
     // UI components
-    private let splitView = NSSplitView()
+    private let splitView = NSSplitView()          // horizontal: sidebar | rightPane
     private let sidebarView = NSView()
     private let sidebarScrollView = NSScrollView()
     private let sidebarStackView = NSStackView()
+    private let rightSplitView = NSSplitView()     // vertical: tabs | master
     private let terminalContainerView = NSView()
+    private let masterContainerView = NSView()
+    private var masterSurfaceView: TerminalNSView?
+    private var masterSessionId: String?
     private var currentTerminalView: TerminalNSView?
     private var claudeTabCounter: Int = 0
     private var terminalTabCounter: Int = 0
 
     private let sidebarWidth: CGFloat = 210
+    private let masterHeight: CGFloat = 250
 
     init(ghosttyApp: DeckardGhosttyApp) {
         self.ghosttyApp = ghosttyApp
@@ -72,6 +77,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
 
         setupUI()
+        createMasterSurface()
         restoreOrCreateInitialTab()
 
         // Start autosaving state every 8 seconds
@@ -134,16 +140,29 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             sidebarStackView.widthAnchor.constraint(equalTo: sidebarScrollView.widthAnchor),
         ])
 
-        // Terminal container
+        // Right pane: vertical split with tab terminal on top, master at bottom
+        rightSplitView.isVertical = false  // vertical split (top/bottom)
+        rightSplitView.dividerStyle = .thin
+        rightSplitView.translatesAutoresizingMaskIntoConstraints = false
+
         terminalContainerView.translatesAutoresizingMaskIntoConstraints = false
+        masterContainerView.translatesAutoresizingMaskIntoConstraints = false
+        masterContainerView.wantsLayer = true
 
-        // Add to split view
+        rightSplitView.addArrangedSubview(terminalContainerView)
+        rightSplitView.addArrangedSubview(masterContainerView)
+
+        // Add to main split view
         splitView.addArrangedSubview(sidebarView)
-        splitView.addArrangedSubview(terminalContainerView)
+        splitView.addArrangedSubview(rightSplitView)
 
-        // Set initial sidebar width after layout
+        // Set initial sizes after layout
         DispatchQueue.main.async { [self] in
             splitView.setPosition(sidebarWidth, ofDividerAt: 0)
+            let rightHeight = rightSplitView.bounds.height
+            if rightHeight > 0 {
+                rightSplitView.setPosition(rightHeight - masterHeight, ofDividerAt: 0)
+            }
         }
     }
 
@@ -299,9 +318,61 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
     }
 
+    // MARK: - Master Session
+
+    private func createMasterSurface() {
+        guard let app = ghosttyApp.app else { return }
+
+        let surfaceView = TerminalNSView()
+        surfaceView.translatesAutoresizingMaskIntoConstraints = false
+        masterContainerView.addSubview(surfaceView)
+        NSLayoutConstraint.activate([
+            surfaceView.topAnchor.constraint(equalTo: masterContainerView.topAnchor),
+            surfaceView.bottomAnchor.constraint(equalTo: masterContainerView.bottomAnchor),
+            surfaceView.leadingAnchor.constraint(equalTo: masterContainerView.leadingAnchor),
+            surfaceView.trailingAnchor.constraint(equalTo: masterContainerView.trailingAnchor),
+        ])
+
+        var envVars: [String: String] = ["DECKARD_SESSION_TYPE": "master"]
+
+        // Build the MCP config JSON
+        var mcpFlag = ""
+        if let mcpPath = Bundle.main.resourceURL?.appendingPathComponent("bin/deckard-mcp").path {
+            // Write MCP config to a temp file since the JSON is complex
+            let mcpConfig = ["mcpServers": ["deckard": ["command": mcpPath, "type": "stdio"]]]
+            let mcpConfigPath = "/tmp/deckard-mcp-config.json"
+            if let data = try? JSONSerialization.data(withJSONObject: mcpConfig),
+               let _ = try? data.write(to: URL(fileURLWithPath: mcpConfigPath)) {
+                mcpFlag = " --mcp-config \(mcpConfigPath)"
+            }
+        }
+
+        let systemPrompt = "You are the master controller for Deckard, a multi-session Claude Code terminal manager. You have MCP tools (via the deckard server) to list_tabs, create_tab, rename_tab, close_tab, focus_tab, get_tab_status, and create_terminal_tab. Use these to help the user manage their Claude Code sessions. When you see tabs with generic names, use list_tabs and rename_tab to give them descriptive 2-4 word names based on what the session is working on. Keep responses concise."
+
+        // Load saved master session ID for resumption
+        let state = SessionManager.shared.load()
+        masterSessionId = state?.masterSessionId
+        let resumeFlag = masterSessionId.map { " --resume \($0)" } ?? ""
+
+        let pathPrefix = "export PATH=\"$DECKARD_BIN_DIR:$PATH\"; "
+        let initialInput = "\(pathPrefix)clear; claude\(mcpFlag)\(resumeFlag) --append-system-prompt '\(systemPrompt)'\n"
+
+        let masterId = UUID()
+        surfaceView.createSurface(
+            app: app,
+            tabId: masterId,
+            workingDirectory: Self.defaultWorkingDirectory,
+            command: nil,
+            envVars: envVars,
+            initialInput: initialInput
+        )
+
+        masterSurfaceView = surfaceView
+    }
+
     func focusMasterSession() {
-        if let masterIndex = tabs.firstIndex(where: { $0.isMaster }) {
-            selectTab(at: masterIndex)
+        if let masterView = masterSurfaceView {
+            window?.makeFirstResponder(masterView)
         }
     }
 
@@ -354,10 +425,40 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         return tabs[selectedTabIndex].id == surfaceId && (window?.isKeyWindow ?? false)
     }
 
+    // MARK: - Remote Control (via socket/MCP)
+
+    func renameTab(id tabIdStr: String, name: String) {
+        guard let tabId = UUID(uuidString: tabIdStr) else { return }
+        for (i, tab) in tabs.enumerated() {
+            if tab.id == tabId {
+                tab.name = name
+                tab.nameOverride = true
+                updateSidebarItem(at: i)
+                saveState()
+                break
+            }
+        }
+    }
+
+    func closeTabById(_ tabIdStr: String) {
+        guard let tabId = UUID(uuidString: tabIdStr) else { return }
+        if let index = tabs.firstIndex(where: { $0.id == tabId }) {
+            closeTab(at: index)
+        }
+    }
+
     // MARK: - Session ID Tracking
 
     func updateSessionId(forSurfaceId surfaceIdStr: String, sessionId: String) {
         guard let surfaceId = UUID(uuidString: surfaceIdStr) else { return }
+
+        // Check if this is the master surface
+        if let masterView = masterSurfaceView, masterView.surfaceId == surfaceId {
+            masterSessionId = sessionId
+            saveState()
+            return
+        }
+
         for tab in tabs {
             if tab.id == surfaceId {
                 let oldId = tab.sessionId
@@ -403,6 +504,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     func captureState() -> DeckardState {
         var state = DeckardState()
+        state.masterSessionId = masterSessionId
         state.claudeTabCounter = claudeTabCounter
         state.terminalTabCounter = terminalTabCounter
         state.defaultWorkingDirectory = Self.defaultWorkingDirectory
