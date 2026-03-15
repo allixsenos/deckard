@@ -1129,6 +1129,7 @@ class HorizontalTabView: NSView, NSTextFieldDelegate {
         closeButton.isBordered = false
         closeButton.font = .systemFont(ofSize: 12)
         closeButton.contentTintColor = .tertiaryLabelColor
+        closeButton.toolTip = "Close Tab (\u{2318}W)"
 
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
