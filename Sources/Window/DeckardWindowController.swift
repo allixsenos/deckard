@@ -345,8 +345,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         if let mcpPath = Bundle.main.resourceURL?.appendingPathComponent("bin/deckard-mcp").path {
             let socketPath = ControlSocket.shared.path
             let mcpConfig: [String: Any] = ["mcpServers": ["deckard": [
-                "command": mcpPath,
-                "type": "stdio",
+                "command": "python3",
+                "args": [mcpPath],
                 "env": ["DECKARD_SOCKET_PATH": socketPath]
             ]]]
             let mcpConfigPath = "/tmp/deckard-mcp-config.json"
