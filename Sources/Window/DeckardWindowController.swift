@@ -42,6 +42,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     private let sidebarStackView = NSStackView()
     private let terminalContainerView = NSView()
     private var currentTerminalView: TerminalNSView?
+    private var claudeTabCounter: Int = 0
+    private var terminalTabCounter: Int = 0
 
     private let sidebarWidth: CGFloat = 210
 
@@ -103,7 +105,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         // Stack view for tab buttons (vertical list)
         sidebarStackView.orientation = .vertical
-        sidebarStackView.alignment = .width
+        sidebarStackView.alignment = .leading
         sidebarStackView.spacing = 1
         sidebarStackView.translatesAutoresizingMaskIntoConstraints = false
 
@@ -163,7 +165,16 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         let effectiveWorkingDirectory = workingDirectory ?? Self.defaultWorkingDirectory
 
         let surfaceView = TerminalNSView()
-        let tabName = name ?? (claude ? "New Session" : "Terminal")
+        let tabName: String
+        if let name = name {
+            tabName = name
+        } else if claude {
+            claudeTabCounter += 1
+            tabName = "Claude Code #\(claudeTabCounter)"
+        } else {
+            terminalTabCounter += 1
+            tabName = "Terminal #\(terminalTabCounter)"
+        }
         let tab = TabItem(surfaceView: surfaceView, name: tabName, isClaude: claude)
         tab.workingDirectory = workingDirectory
 
@@ -305,6 +316,9 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                                  target: self,
                                  action: #selector(tabRowClicked(_:)))
             sidebarStackView.addArrangedSubview(row)
+            // Pin row to full width of stack view
+            row.leadingAnchor.constraint(equalTo: sidebarStackView.leadingAnchor).isActive = true
+            row.trailingAnchor.constraint(equalTo: sidebarStackView.trailingAnchor).isActive = true
         }
 
         updateSidebarSelection()
@@ -418,10 +432,8 @@ class TabRowView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         if isSelected {
             NSColor.selectedContentBackgroundColor.withAlphaComponent(0.3).setFill()
-            let path = NSBezierPath(roundedRect: bounds, xRadius: 4, yRadius: 4)
-            path.fill()
+            bounds.fill()
         }
-        super.draw(dirtyRect)
     }
 
     override func mouseDown(with event: NSEvent) {
