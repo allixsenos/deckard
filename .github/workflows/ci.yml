@@ -29,6 +29,9 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Select Xcode 16
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+
       - name: Install Zig
         uses: mlugg/setup-zig@v2
         with:
@@ -45,9 +48,6 @@ jobs:
         if: steps.cache-ghostty.outputs.cache-hit != 'true'
         working-directory: ghostty
         run: zig build -Demit-xcframework -Dxcframework-target=native -Doptimize=ReleaseFast
-
-      - name: Select Xcode 16
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app
 
       - name: Build Deckard
         run: |
