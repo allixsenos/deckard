@@ -505,7 +505,16 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             let extraArgs = UserDefaults.standard.string(forKey: "claudeExtraArgs") ?? ""
             let extraArgsSuffix = extraArgs.isEmpty ? "" : " \(extraArgs)"
             if let sid = sessionIdToResume {
-                initialInput = "\(prefix)claude --resume \(sid)\(extraArgsSuffix)\n"
+                // Verify the session JSONL file still exists before attempting resume.
+                // The session ID may be orphaned if Claude exited before writing the file.
+                let encoded = project.path.replacingOccurrences(of: "/", with: "-")
+                let jsonlPath = NSHomeDirectory() + "/.claude/projects/\(encoded)/\(sid).jsonl"
+                if FileManager.default.fileExists(atPath: jsonlPath) {
+                    initialInput = "\(prefix)claude --resume \(sid)\(extraArgsSuffix)\n"
+                } else {
+                    tab.sessionId = nil
+                    initialInput = "\(prefix)claude\(extraArgsSuffix)\n"
+                }
             } else {
                 initialInput = "\(prefix)claude\(extraArgsSuffix)\n"
             }
@@ -777,6 +786,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 } else {
                     rebuildSidebar()
                 }
+                saveState()
                 return
             }
         }
