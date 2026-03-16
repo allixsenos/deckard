@@ -1,6 +1,6 @@
 # Deckard
 
-A terminal built for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Deckard is a native macOS app that treats Claude Code sessions as first-class objects — each tab knows whether Claude is thinking, waiting for input, or needs tool approval, and tracks context window usage so you know when a session is running low.
+A terminal built for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Deckard is a native macOS app that treats Claude Code sessions as first-class objects. Each tab knows whether Claude is thinking, waiting for input, or needs tool approval, and tracks context window usage so you know when a session is running low.
 
 Run multiple sessions side by side in a single window with tabs, projects, and session persistence. Built with Swift and AppKit. Terminal rendering powered by [Ghostty](https://ghostty.org/).
 
@@ -10,11 +10,11 @@ Run multiple sessions side by side in a single window with tabs, projects, and s
 
 ## Features
 
-- **Multi-tab sessions** — Open multiple Claude Code (and plain terminal) tabs per project. Switch between them with Cmd+1–9 or drag to reorder.
-- **Project sidebar** — Organize work by folder. Each project gets its own set of tabs, persisted across restarts.
-- **Context usage tracking** — A progress bar shows how much of Claude's context window the active session has consumed.
-- **Session state detection** — Tab badges show whether Claude is thinking, waiting for input, needs tool permission, or has errored.
-- **GPU-accelerated rendering** — Terminal surfaces are rendered through Metal via Ghostty's libghostty.
+- **Multi-tab sessions**: Open multiple Claude Code (and plain terminal) tabs per project. Switch between them with Cmd+1–9 or drag to reorder.
+- **Project sidebar**: Organize work by folder. Each project gets its own set of tabs, persisted across restarts.
+- **Context usage tracking**: A progress bar shows how much of Claude's context window the active session has consumed.
+- **Session state detection**: Tab badges show whether Claude is thinking, waiting for input, needs tool permission, or has errored.
+- **GPU-accelerated rendering**: Terminal surfaces are rendered through Metal via Ghostty's libghostty.
 
 ## Requirements
 
@@ -50,7 +50,7 @@ The built app will be in your Xcode DerivedData directory.
 
 ## How It Works
 
-Deckard wraps the `claude` CLI with a thin hook layer. When Claude Code launches inside a Deckard tab, the wrapper injects lifecycle hooks via a Unix domain socket so the app can track session state, detect context usage, and surface notifications — without modifying Claude Code itself.
+Deckard wraps the `claude` CLI with a thin hook layer. When Claude Code launches inside a Deckard tab, the wrapper injects lifecycle hooks via a Unix domain socket so the app can track session state, detect context usage, and surface notifications, without modifying Claude Code itself.
 
 ## License
 
