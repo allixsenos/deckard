@@ -7,6 +7,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var ghosttyApp: DeckardGhosttyApp!
     var windowController: DeckardWindowController?
     private let hookHandler = HookHandler()
+    let updateController = UpdateController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.shared = self
@@ -52,10 +53,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Set socket path in environment for child processes.
         setenv("DECKARD_SOCKET_PATH", ControlSocket.shared.path, 1)
 
+        // Start the auto-updater.
+        updateController.startUpdater()
+
         // Create and show the main window.
         windowController = DeckardWindowController(ghosttyApp: ghosttyApp)
         hookHandler.windowController = windowController
         windowController?.showWindow(nil)
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // Allow quit during update installation.
+        if updateController.isInstalling { return .terminateNow }
+        return .terminateNow
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -98,6 +108,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "About Deckard", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Check for Updates...", action: #selector(checkForUpdates), keyEquivalent: "")
         appMenu.addItem(withTitle: "Settings...", action: #selector(showSettings), keyEquivalent: ",")
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Quit Deckard", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
@@ -223,7 +234,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         windowController?.toggleSidebar()
     }
 
-@objc private func showSettings() {
+    @objc private func showSettings() {
         SettingsWindowController.shared.show()
+    }
+
+    @objc func checkForUpdates() {
+        updateController.checkForUpdates()
     }
 }
