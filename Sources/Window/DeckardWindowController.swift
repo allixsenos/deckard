@@ -228,7 +228,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         window?.addTitlebarAccessoryViewController(accessoryVC)
 
         NSLayoutConstraint.activate([
-            sidebarStackView.topAnchor.constraint(equalTo: sidebarView.topAnchor, constant: 4),
+            sidebarStackView.topAnchor.constraint(equalTo: sidebarView.topAnchor),
             sidebarStackView.leadingAnchor.constraint(equalTo: sidebarView.leadingAnchor),
             sidebarStackView.trailingAnchor.constraint(equalTo: sidebarView.trailingAnchor),
 
