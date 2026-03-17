@@ -1,4 +1,5 @@
 import AppKit
+import Fuse
 
 /// A Spotlight-style project picker that appears when creating a new Claude tab.
 /// Shows recent projects from ~/.claude/projects/, sorted by recency.
@@ -17,6 +18,7 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
     private var spotlightSearch: Process?
     private var spotlightPipe: Pipe?
     private var excludePaths: Set<String> = []
+    private let fuse = Fuse(threshold: 0.4)
 
     override init() {
         // Create a floating panel
@@ -145,12 +147,14 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
     }
 
     private func cancel() {
+        cancelSpotlightSearch()
         panel.orderOut(nil)
         completion?(nil)
         completion = nil
     }
 
     private func confirm() {
+        cancelSpotlightSearch()
         let row = tableView.selectedRow
         let path: String
         if row >= 0, row < filteredProjects.count {
@@ -221,12 +225,27 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
             cancelSpotlightSearch()
             filteredProjects = listDirectories(at: query)
         } else {
-            // Filter Claude projects by name
-            let lq = query.lowercased()
-            filteredProjects = allProjects.filter { $0.path.lowercased().contains(lq) }
+            // Fuzzy match on basename (primary) and full path (fallback)
+            var scored: [(project: (path: String, lastUsed: Date), score: Double)] = []
+            for project in allProjects {
+                let basename = (project.path as NSString).lastPathComponent
+                let bResult = fuse.search(query, in: basename)
+                let pResult = fuse.search(query, in: project.path)
+                let best: Double? = [bResult?.score, pResult?.score]
+                    .compactMap { $0 }.min()
+                if let score = best {
+                    scored.append((project: project, score: score))
+                }
+            }
+            scored.sort {
+                abs($0.score - $1.score) < 0.001
+                    ? $0.project.lastUsed > $1.project.lastUsed
+                    : $0.score < $1.score
+            }
+            filteredProjects = scored.map { $0.project }
 
             // Also search filesystem via mdfind (Spotlight)
-            spotlightSearch?.terminate()
+            cancelSpotlightSearch()
             searchFilesystem(query: query)
         }
         tableView.reloadData()
@@ -314,6 +333,13 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
                     if self.filteredProjects.contains(where: { $0.path == path }) { continue }
                     if path.contains("/.") || path.contains("/Library/") { continue }
                     if path.contains("/node_modules/") || path.contains("/.git/") { continue }
+
+                    // Fuzzy-filter mdfind results
+                    let basename = (path as NSString).lastPathComponent
+                    let bResult = self.fuse.search(query, in: basename)
+                    let pResult = self.fuse.search(query, in: path)
+                    let best = [bResult?.score, pResult?.score].compactMap { $0 }.min()
+                    guard best != nil else { continue }
 
                     self.filteredProjects.append((path: path, lastUsed: .distantPast))
                     added = true
