@@ -15,6 +15,7 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
     private var allProjects: [(path: String, lastUsed: Date)] = []
     private var filteredProjects: [(path: String, lastUsed: Date)] = []
     private var spotlightSearch: Process?
+    private var spotlightPipe: Pipe?
     private var excludePaths: Set<String> = []
 
     override init() {
@@ -199,18 +200,25 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
         confirm()
     }
 
+    /// Safely terminate the spotlight search, clearing the readability handler
+    /// first to prevent NSFileHandleOperationException crashes.
+    private func cancelSpotlightSearch() {
+        spotlightPipe?.fileHandleForReading.readabilityHandler = nil
+        spotlightSearch?.terminate()
+        spotlightSearch = nil
+        spotlightPipe = nil
+    }
+
     // MARK: - NSTextFieldDelegate
 
     func controlTextDidChange(_ obj: Notification) {
         let query = searchField.stringValue
         if query.isEmpty {
             filteredProjects = allProjects
-            spotlightSearch?.terminate()
-            spotlightSearch = nil
+            cancelSpotlightSearch()
         } else if query.hasPrefix("/") || query.hasPrefix("~") {
             // Path-based autocomplete: list directories at the typed path
-            spotlightSearch?.terminate()
-            spotlightSearch = nil
+            cancelSpotlightSearch()
             filteredProjects = listDirectories(at: query)
         } else {
             // Filter Claude projects by name
@@ -272,18 +280,25 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
     private func searchFilesystem(query: String) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/mdfind")
+        // Escape single quotes in the query to prevent Spotlight query injection.
+        let escaped = query.replacingOccurrences(of: "'", with: "\\'")
         process.arguments = [
-            "kMDItemContentType == public.folder && kMDItemFSName == '*\(query)*'cd"
+            "kMDItemContentType == public.folder && kMDItemFSName == '*\(escaped)*'cd"
         ]
 
         let pipe = Pipe()
         process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
 
         let knownPaths = Set(allProjects.map { $0.path })
 
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
-            guard !data.isEmpty else { return }
+            guard !data.isEmpty else {
+                // EOF — process finished, clean up the handler
+                handle.readabilityHandler = nil
+                return
+            }
             let output = String(data: data, encoding: .utf8) ?? ""
             let paths = output.components(separatedBy: "\n")
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -314,6 +329,7 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
 
         try? process.run()
         spotlightSearch = process
+        spotlightPipe = pipe
     }
 
     // MARK: - NSTableViewDataSource
