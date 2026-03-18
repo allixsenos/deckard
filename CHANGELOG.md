@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/allixsenos/deckard/compare/v0.2.1...v0.2.2) (2026-03-18)
+
+
+### Bug Fixes
+
+* **ci:** move build job into release-please workflow ([1596ab1](https://github.com/allixsenos/deckard/commit/1596ab1efe146294d9f0a47a3159454784b65954))
+
 ## [0.2.1](https://github.com/allixsenos/deckard/compare/v0.2.0...v0.2.1) (2026-03-18)
 
 
