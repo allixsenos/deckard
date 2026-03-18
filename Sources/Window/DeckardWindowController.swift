@@ -528,7 +528,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         let initialInput: String?
         if isClaude {
-            let prefix = "stty -echo; export PATH=\"$DECKARD_BIN_DIR:$PATH\"; clear; stty echo; "
+            // unset HISTFILE so the shell can't persist this line to history when claude exits.
+            let prefix = "unset HISTFILE; stty -echo; export PATH=\"$DECKARD_BIN_DIR:$PATH\"; clear; stty echo; "
             let extraArgs = UserDefaults.standard.string(forKey: "claudeExtraArgs") ?? ""
             let extraArgsSuffix = extraArgs.isEmpty ? "" : " \(extraArgs)"
             if let sid = sessionIdToResume {
