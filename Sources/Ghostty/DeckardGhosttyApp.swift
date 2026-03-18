@@ -346,8 +346,43 @@ class DeckardGhosttyApp {
         case GHOSTTY_ACTION_PWD:
             return true
 
-        case GHOSTTY_ACTION_MOUSE_SHAPE,
-             GHOSTTY_ACTION_MOUSE_VISIBILITY,
+        case GHOSTTY_ACTION_MOUSE_SHAPE:
+            let shape = action.action.mouse_shape
+            DispatchQueue.main.async {
+                switch shape {
+                case GHOSTTY_MOUSE_SHAPE_POINTER:
+                    NSCursor.pointingHand.set()
+                case GHOSTTY_MOUSE_SHAPE_TEXT:
+                    NSCursor.iBeam.set()
+                case GHOSTTY_MOUSE_SHAPE_CROSSHAIR:
+                    NSCursor.crosshair.set()
+                case GHOSTTY_MOUSE_SHAPE_GRAB:
+                    NSCursor.openHand.set()
+                case GHOSTTY_MOUSE_SHAPE_GRABBING:
+                    NSCursor.closedHand.set()
+                case GHOSTTY_MOUSE_SHAPE_NOT_ALLOWED, GHOSTTY_MOUSE_SHAPE_NO_DROP:
+                    NSCursor.operationNotAllowed.set()
+                case GHOSTTY_MOUSE_SHAPE_COL_RESIZE, GHOSTTY_MOUSE_SHAPE_EW_RESIZE:
+                    NSCursor.resizeLeftRight.set()
+                case GHOSTTY_MOUSE_SHAPE_ROW_RESIZE, GHOSTTY_MOUSE_SHAPE_NS_RESIZE:
+                    NSCursor.resizeUpDown.set()
+                default:
+                    NSCursor.arrow.set()
+                }
+            }
+            return true
+
+        case GHOSTTY_ACTION_MOUSE_OVER_LINK:
+            let link = action.action.mouse_over_link
+            if link.len > 0, let urlPtr = link.url {
+                let data = Data(bytes: urlPtr, count: Int(link.len))
+                if let url = String(data: data, encoding: .utf8) {
+                    DiagnosticLog.shared.log("link", "MOUSE_OVER_LINK: \(url)")
+                }
+            }
+            return true
+
+        case GHOSTTY_ACTION_MOUSE_VISIBILITY,
              GHOSTTY_ACTION_RENDERER_HEALTH,
              GHOSTTY_ACTION_CELL_SIZE,
              GHOSTTY_ACTION_RENDER,
@@ -368,12 +403,28 @@ class DeckardGhosttyApp {
             return true
 
         case GHOSTTY_ACTION_OPEN_URL:
-            if let urlPtr = action.action.open_url.url {
-                let url = String(cString: urlPtr)
-                if let nsurl = URL(string: url) {
-                    DispatchQueue.main.async {
-                        NSWorkspace.shared.open(nsurl)
-                    }
+            let openUrl = action.action.open_url
+            if let urlPtr = openUrl.url {
+                // Use explicit length (matching Ghostty) instead of cString
+                // to avoid reading past the buffer if not null-terminated.
+                let data = Data(bytes: urlPtr, count: Int(openUrl.len))
+                guard let urlString = String(data: data, encoding: .utf8), !urlString.isEmpty else {
+                    return true
+                }
+                DiagnosticLog.shared.log("link", "OPEN_URL: \(urlString)")
+
+                // If the URL has a valid scheme, use it directly. Otherwise treat
+                // it as a file path (matching Ghostty's handling).
+                let url: URL
+                if let candidate = URL(string: urlString), candidate.scheme != nil {
+                    url = candidate
+                } else {
+                    let expanded = NSString(string: urlString).standardizingPath
+                    url = URL(filePath: expanded)
+                }
+
+                DispatchQueue.main.async {
+                    NSWorkspace.shared.open(url)
                 }
             }
             return true
