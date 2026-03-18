@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/allixsenos/deckard/compare/v0.2.0...v0.2.1) (2026-03-18)
+
+
+### Bug Fixes
+
+* **ci:** trigger release build on release publish instead of tag push ([4c0c7b7](https://github.com/allixsenos/deckard/commit/4c0c7b74249970e531e794f095822d6b2c6a5322))
+
 ## [0.2.0](https://github.com/allixsenos/deckard/compare/v0.1.8...v0.2.0) (2026-03-18)
 
 
